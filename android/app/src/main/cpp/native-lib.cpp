@@ -1,33 +1,40 @@
 #include <jni.h>
 #include <opencv2/opencv.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 extern "C" {
-    JNIEXPORT jbyteArray JNICALL
-    Java_com_example_treadscan_NativeLib_processImage(JNIEnv *env, jobject /* this */, jbyteArray inputImageBytes) {
-        // inputImageBytes -> cv::Mat
-        jbyte* bytes = env->GetByteArrayElements(inputImageBytes, NULL);
-        jsize length = env->GetArrayLength(inputImageBytes);
-        std::vector<uchar> buffer(bytes, bytes + length);
-        env->ReleaseByteArrayElements(inputImageBytes, bytes, 0);
+    JNIEXPORT void JNICALL
+    Java_com_example_treadscan_NativeLib_processImage(JNIEnv *env, jobject thiz, jlong mat_addr, jint kernel_size, jdouble sigma, jstring filter_method, jdouble brightness, jdouble contrast, jfloat skew_x, jfloat skew_y) {
 
-        cv::Mat img = cv::imdecode(buffer, cv::IMREAD_COLOR);
-        if (img.empty()) return NULL;
+        // OpenCV Mat get object
+        cv::Mat &mat = *(cv::Mat *) mat_addr;
 
-        // OpenCV GaussianBlur
-        cv::GaussianBlur(img, img, cv::Size(5,5), 0);
+        // Filter Method get param
+        const char *filter_method_str = env->GetStringUTFChars(filter_method, 0);
 
-        //  (alpha , beta)
-        double alpha = 1.2; //
-        int beta = 10;
-        img.convertTo(img, -1, alpha, beta);
+        // Gaussian Blur or  Median Filter apply
+        cv::Mat result;
+        if (strcmp(filter_method_str, "Gaussian") == 0) {
+            // Gaussian Blur
+            cv::GaussianBlur(mat, result, cv::Size(kernel_size, kernel_size), sigma);
+        } else {
+            // Median Filter
+            cv::medianBlur(mat, result, kernel_size);
+        }
 
-        //
-        std::vector<uchar> outBuf;
-        cv::imencode(".jpg", img, outBuf);
+        // brightness/ contrast
+        result.convertTo(result, -1, contrast, brightness);
 
-        jbyteArray outputArray = env->NewByteArray(outBuf.size());
-        env->SetByteArrayRegion(outputArray, 0, outBuf.size(), reinterpret_cast<jbyte*>(outBuf.data()));
+        // perspective
+        cv::Mat transform_matrix = cv::getRotationMatrix2D(cv::Point2f(result.cols / 2, result.rows / 2), skew_x, 1.0);
+        cv::warpAffine(result, result, transform_matrix, result.size());
 
-        return outputArray;
+        // result
+        mat = result;
+
+        // JNI release
+        env->ReleaseStringUTFChars(filter_method, filter_method_str);
     }
 }

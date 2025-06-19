@@ -1,212 +1,294 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'noise_removal_dialog.dart';
-import 'brightness_dialog.dart';
-import 'perspective_dialog.dart';
 
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import '../services/image_processor.dart';
-
+import 'package:image_picker/image_picker.dart';
 
 class ImageProcessingPage extends StatefulWidget {
-  final File imageFile;
-
-  const ImageProcessingPage({super.key, required this.imageFile});
-
   @override
+
+  final File image;
+
+  const ImageProcessingPage({super.key, required this.image});
+
   ImageProcessingPageState createState() => ImageProcessingPageState();
 }
+class ImageProcessingPageState extends State<ImageProcessingPage> with SingleTickerProviderStateMixin {
 
-class ImageProcessingPageState extends State<ImageProcessingPage> {
-  int kernelSize = 5;
-  double sigmaX = 1.0;
-  bool useMedianBlur = false;
-  double noiseRemovalStrength = 0.5;
-  double brightness = 0.5;
-  double perspective = 0.5;
+  File? _processedImage;
 
-  String? processedImageBase64;
+
+  String _noiseMethod = 'GaussianBlur';
+  int _kernelSize = 3;
+  double _sigma = 1.0;
+  double _brightness = 0.0;
+  double _alpha = 1.0;
+  double _beta = 0.0;
+  double _skewX = 0.0;
+  double _skewY = 0.0;
+
+  // TabController for managing tabs
+  late TabController _tabController;
+
+  // Noise Method
+  List<String> noiseMethods = ['GaussianBlur', 'MedianBlur'];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  //
+  Future<void> processImage() async {
+    print('Processing Image with parameters: $_noiseMethod, $_kernelSize, $_sigma, $_brightness, $_alpha, $_beta, $_skewX, $_skewY');
+
+    //
+    setState(() {
+
+      _processedImage = widget.image;
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Image Preprocessing')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            //
-            Image.file(widget.imageFile, height: 300, fit: BoxFit.cover),
-            const SizedBox(height: 20),
+      appBar: AppBar(
+        title: Text('Image Preprocessing'),
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
 
-
-            if (processedImageBase64 != null)
-              Column(
+              //
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 20),
-                  Text("Processed Image", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  Image.memory(
-                    base64Decode(processedImageBase64!),
-                    height: 300,
-                    fit: BoxFit.cover,
+                  //
+                  Image.file(
+                    widget.image,
+                    width: 150,
+                    height: 150,
+                  ),
+                  SizedBox(width: 20),
+                  //
+                  _processedImage == null
+                      ? Text('No processed image.')
+                      : Image.file(
+                    _processedImage!,
+                    width: 150,
+                    height: 150,
                   ),
                 ],
               ),
+              SizedBox(height: 20),
 
+              //
+              ElevatedButton(
+                onPressed: () {
+                  processImage();
+                },
+                child: Text('Preprocess Image'),
+              ),
+              SizedBox(height: 20),
 
-            //
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(200, 30),
+              //
+              Container(
+                height: 320, // Content area height
+                child: Column(
+                  children: [
+
+                    TabBar(
+                      controller: _tabController,
+                      tabs: [
+                        Tab(text: 'Noise Settings'),
+                        Tab(text: 'Brightness/Contrast'),
+                        Tab(text: 'Skew Settings'),
+                      ],
+                    ),
+
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Noise Method:'),
+                                DropdownButton<String>(
+                                  value: _noiseMethod,
+                                  onChanged: (String? newValue) {
+                                    setState(() {
+                                      _noiseMethod = newValue!;
+                                    });
+                                  },
+                                  items: noiseMethods.map<DropdownMenuItem<String>>((String value) {
+                                    return DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value),
+                                    );
+                                  }).toList(),
+                                ),
+                                SizedBox(height: 20),
+                                Text('Kernel Size:'),
+                                DropdownButton<int>(
+                                  value: _kernelSize,
+                                  onChanged: (int? newValue) {
+                                    setState(() {
+                                      _kernelSize = newValue!;
+                                    });
+                                  },
+                                  items: [3, 5, 7, 9, 11]
+                                      .map<DropdownMenuItem<int>>((int value) {
+                                    return DropdownMenuItem<int>(
+                                      value: value,
+                                      child: Text(value.toString()),
+                                    );
+                                  }).toList(),
+                                ),
+                                SizedBox(height: 20),
+                                Text('Sigma: $_sigma'),
+                                Slider(
+                                  min: 0.0,
+                                  max: 5.0,
+                                  value: _sigma,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _sigma = (value * 10).round() / 10;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+
+                         Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Brightness: $_brightness'),
+                                Slider(
+                                  min: -255.0,
+                                  max: 255.0,
+                                  value: _brightness,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _brightness =  (value * 10).round() / 10;
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: 20),
+                                Text('Alpha (Contrast): $_alpha'),
+                                Slider(
+                                  min: 0.0,
+                                  max: 2.0,
+                                  value: _alpha,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _alpha =  (value * 10).round() / 10;
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: 20),
+                                Text('Beta (Brightness): $_beta'),
+                                Slider(
+                                  min: -100.0,
+                                  max: 100.0,
+                                  value: _beta,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _beta =  (value * 10).round() / 10;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('SkewX: $_skewX'),
+                                Slider(
+                                  min: -45.0,
+                                  max: 45.0,
+                                  value: _skewX,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _skewX =  (value * 10).round() / 10;
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: 20),
+                                Text('SkewY: $_skewY'),
+                                Slider(
+                                  min: -45.0,
+                                  max: 45.0,
+                                  value: _skewY,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _skewY =  (value * 10).round() / 10;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Confirm, Cancel button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      processImage();
+                    },
+                    child: Text('Confirm'),
                   ),
-                  onPressed: () {
-                    //
-                    removeNoise();
-                  },
-                  child: Text("Remove Noise"),
-                ),
-                IconButton(
-                  onPressed: () async {
-
-                    double? newStrength = await showDialog(
-                      context: context,
-                      builder: (context) {
-                        return NoiseRemovalDialog(initialStrength: noiseRemovalStrength);
-                      },
-                    );
-
-                    if (newStrength != null) {
+                  ElevatedButton(
+                    onPressed: () {
                       setState(() {
-                        noiseRemovalStrength = newStrength;
+                        _kernelSize = 3;
+                        _sigma = 1.0;
+                        _brightness = 0.0;
+                        _alpha = 1.0;
+                        _beta = 0.0;
+                        _skewX = 0.0;
+                        _skewY = 0.0;
                       });
-                    }
-                  },
-                  icon: Icon(Icons.settings),
-                  color: Colors.blue,
-                ),
-              ],
-            ),
-
-            //
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(200, 30),
+                    },
+                    child: Text('Cancel'),
                   ),
-
-                  onPressed: () {
-                    //
-
-                  },
-                  child: Text("contrast/brightness"),
-                ),
-                IconButton(
-                  onPressed: () async {
-                    //
-                    double? newBrightness = await showDialog(
-                      context: context,
-                      builder: (context) {
-                        return BrightnessDialog(initialBrightness: brightness);
-                      },
-                    );
-
-                    if (newBrightness != null) {
-                      setState(() {
-                        brightness = newBrightness;
-                      });
-                    }
-                  },
-                  icon: Icon(Icons.settings),
-                  color: Colors.blue,
-                ),
-              ],
-            ),
-
-            //
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(200, 30),
-                  ),
-
-                  onPressed: () {
-                    //
-
-                  },
-                  child: Text("Align Perspective"),
-                ),
-                IconButton(
-                  onPressed: () async {
-                    //
-                    double? newPerspective = await showDialog(
-                      context: context,
-                      builder: (context) {
-                        return PerspectiveDialog(initialPerspective: perspective);
-                      },
-                    );
-
-                    if (newPerspective != null) {
-                      setState(() {
-                        perspective = newPerspective;
-                      });
-                    }
-                  },
-                  icon: Icon(Icons.settings),
-                  color: Colors.blue,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            //
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    //
-
-                  },
-                  child: const Text("Confirm"),
-                ),
-                const SizedBox(width: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    //
-                    Navigator.pop(context);
-                  },
-                  child: const Text("Cancel"),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
-  //
-  Future<void> removeNoise() async {
-    //
-    String? base64Image = await ImageProcessor.removeNoise(widget.imageFile as String,kernelSize,sigmaX,useMedianBlur);
-
-    if (base64Image != null) {
-      setState(() {
-        processedImageBase64 = base64Image;
-      });
-    }
-  }
-
 }

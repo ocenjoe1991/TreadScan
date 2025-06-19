@@ -83,7 +83,7 @@ class ResultPageState extends State<ResultPage> {
                   //
                   final result = await Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ImageProcessingPage(imageFile: widget.imageFile)),
+                    MaterialPageRoute(builder: (context) => ImageProcessingPage(image: widget.imageFile)),
                   );
 
                   if (result != null) {
